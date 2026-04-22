@@ -2,7 +2,7 @@
 
 GBA emulator wrapper + Pokemon Gen 3 game state adapters.
 
-Part of the [pokebenchmark](https://github.com/ConvoSearch/pokebenchmark-platform) benchmarking framework for LLM agents playing Pokemon on the Game Boy Advance.
+Part of the [pokebenchmark](https://github.com/ShardulAgg/pokebenchmark-platform) benchmarking framework for LLM agents playing Pokemon on the Game Boy Advance.
 
 ## What's here
 
@@ -15,7 +15,7 @@ Part of the [pokebenchmark](https://github.com/ConvoSearch/pokebenchmark-platfor
 pip install pokebenchmark-emulator
 ```
 
-Requires `mgba` Python bindings (built from source — see the [pokebenchmark Dockerfile](https://github.com/ConvoSearch/pokebenchmark-platform/blob/main/Dockerfile) for a working build recipe).
+Requires `mgba` Python bindings (built from source — see the [pokebenchmark Dockerfile](https://github.com/ShardulAgg/pokebenchmark-platform/blob/main/Dockerfile) for a working build recipe).
 
 ## Usage
 
