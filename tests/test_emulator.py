@@ -151,3 +151,27 @@ class TestCaptureFrame:
         emu = make_emulator()
         capture_frame(emu)
         emu.gba.core.run_frame.assert_called()
+
+
+class TestHeldKeyAccessors:
+    def test_set_keys_passes_bitmask_through(self):
+        emu = make_emulator()
+        emu.set_keys(0b0101010101)
+        emu.gba.core.set_keys.assert_called_once_with(0b0101010101)
+
+    def test_set_keys_accepts_zero(self):
+        emu = make_emulator()
+        emu.set_keys(0)
+        emu.gba.core.set_keys.assert_called_once_with(0)
+
+    def test_run_frame_advances_one_frame(self):
+        emu = make_emulator()
+        emu.run_frame()
+        emu.gba.core.run_frame.assert_called_once_with()
+
+    def test_framebuffer_image_returns_pil_without_advancing(self):
+        emu = make_emulator()
+        img = emu.framebuffer_image()
+        emu.gba.core.run_frame.assert_not_called()
+        assert img.size == (240, 160)
+        assert img.mode == "RGB"

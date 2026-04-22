@@ -67,5 +67,17 @@ class GBAEmulator:
         self.gba.core.run_frame()
         return self._framebuffer.to_pil().convert("RGB")
 
+    def set_keys(self, keys: int) -> None:
+        """Set the held-key bitmask (mGBA GBA_KEY_* bits). Persists across frames."""
+        self.gba.core.set_keys(keys)
+
+    def run_frame(self) -> None:
+        """Advance exactly one frame using currently held keys."""
+        self.gba.core.run_frame()
+
+    def framebuffer_image(self):
+        """Return the current framebuffer as a PIL RGB image without advancing."""
+        return self._framebuffer.to_pil().convert("RGB")
+
     def reset(self):
         self.gba.core.reset()
