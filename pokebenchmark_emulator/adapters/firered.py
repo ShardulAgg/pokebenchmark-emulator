@@ -15,6 +15,15 @@ SB1_MAPNUM_OFFSET = 0x05    # u8
 SB2_PLAYERNAME_OFFSET = 0x00  # 7 bytes (up to 7 chars + terminator)
 SB2_PLAYERNAME_LENGTH = 7
 SB2_BADGES_OFFSET = 0x08     # u8 — bitmask of badges
+SB2_SECURITY_KEY_OFFSET = 0x0F20  # u32 — FireRed money XOR key
+
+# Offsets within SaveBlock1 for party + money
+SB1_PARTY_COUNT_OFFSET = 0x34       # u8, 0..6
+SB1_PARTY_OFFSET = 0x38             # 6 × 100-byte PokemonStruct
+SB1_MONEY_OFFSET = 0x0290           # u32, XOR'd with security key
+GEN3_PARTY_MON_SIZE = 100
+GEN3_PARTY_MAX = 6
+MONEY_CAP = 999_999
 
 # Badge names for FireRed (Kanto order)
 FIRERED_BADGE_NAMES = [
@@ -253,6 +262,37 @@ class FireRedAdapter(GameAdapter):
             if (badge_byte >> i) & 1
         ]
 
+        # Import here to avoid a circular import at module load (the helper
+        # module imports `decode_string` from this file).
+        from ._gen3_mon import read_gen3_party_mon
+
+        # Read party
+        party: list[dict] = []
+        try:
+            party_count = emulator.read_u8(sb1_base + SB1_PARTY_COUNT_OFFSET)
+            for i in range(min(party_count, GEN3_PARTY_MAX)):
+                slot_addr = sb1_base + SB1_PARTY_OFFSET + (i * GEN3_PARTY_MON_SIZE)
+                mon = read_gen3_party_mon(emulator, slot_addr)
+                if mon is not None:
+                    party.append(mon)
+        except Exception:
+            # If a read fails mid-party we return what we have rather than
+            # exploding the whole state read.
+            pass
+
+        # Read money (XOR'd with security key)
+        try:
+            security_key = emulator.read_u32(sb2_base + SB2_SECURITY_KEY_OFFSET)
+            money_raw = emulator.read_u32(sb1_base + SB1_MONEY_OFFSET)
+            money = (money_raw ^ security_key) & 0xFFFFFFFF
+            if money > MONEY_CAP:
+                # Either the security key isn't initialized yet (fresh save,
+                # pre-intro) or we're looking at garbage — game caps at
+                # 999,999 so any higher value is by definition wrong.
+                money = 0
+        except Exception:
+            money = None
+
         return GameState(
             player_name=player_name,
             location=location,
@@ -260,10 +300,8 @@ class FireRedAdapter(GameAdapter):
             y=y,
             facing="unknown",
             badges=badges,
-            money=0,
-            party=[],
-            bag=[],
-            dialog="",
+            money=money,
+            party=party,
             in_battle=False,
-            battle_state=None,
+            # bag / dialog / battle_state left as None — not extracted yet.
         )

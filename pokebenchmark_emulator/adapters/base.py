@@ -14,42 +14,51 @@ class BattleState:
 
 @dataclass
 class GameState:
+    """Game state read by an adapter.
+
+    Only the first five fields are considered broadly universal. Everything
+    else defaults to None: adapters populate what they actually read, and
+    consumers can distinguish "not populated" from "populated as empty".
+    """
     player_name: str
     location: str
     x: int
     y: int
     facing: str
-    badges: list[str]
-    money: int
-    party: list[dict]
-    bag: list[dict]
-    dialog: str
-    in_battle: bool
+    badges: list[str] | None = None
+    money: int | None = None
+    party: list[dict] | None = None
+    bag: list[dict] | None = None
+    dialog: str | None = None
+    in_battle: bool | None = None
     battle_state: BattleState | None = None
 
     def to_text(self) -> str:
         lines = []
         lines.append(f"Player: {self.player_name}")
         lines.append(f"Location: {self.location} ({self.x}, {self.y}) facing {self.facing}")
-        lines.append(f"Money: ${self.money}")
-        if self.badges:
-            lines.append(f"Badges: {', '.join(self.badges)}")
-        else:
-            lines.append("Badges: none")
-        lines.append("")
-        lines.append("Party:")
-        for mon in self.party:
-            hp_str = f"{mon.get('hp', '?')}/{mon.get('max_hp', '?')}"
-            moves = ", ".join(mon.get("moves", []))
-            lines.append(f"  {mon.get('species', '?')} Lv{mon.get('level', '?')} HP:{hp_str} [{moves}]")
-        if not self.party:
-            lines.append("  (empty)")
-        lines.append("")
-        lines.append("Bag:")
-        for item in self.bag:
-            lines.append(f"  {item.get('item', '?')} x{item.get('quantity', '?')}")
-        if not self.bag:
-            lines.append("  (empty)")
+        if self.money is not None:
+            lines.append(f"Money: ${self.money}")
+        if self.badges is not None:
+            lines.append(f"Badges: {', '.join(self.badges) if self.badges else 'none'}")
+        if self.party is not None:
+            lines.append("")
+            lines.append("Party:")
+            if self.party:
+                for mon in self.party:
+                    hp_str = f"{mon.get('hp', '?')}/{mon.get('max_hp', '?')}"
+                    moves = ", ".join(mon.get("moves", []))
+                    lines.append(f"  {mon.get('species', '?')} Lv{mon.get('level', '?')} HP:{hp_str} [{moves}]")
+            else:
+                lines.append("  (empty)")
+        if self.bag is not None:
+            lines.append("")
+            lines.append("Bag:")
+            if self.bag:
+                for item in self.bag:
+                    lines.append(f"  {item.get('item', '?')} x{item.get('quantity', '?')}")
+            else:
+                lines.append("  (empty)")
         if self.dialog:
             lines.append("")
             lines.append(f"Dialog: {self.dialog}")
