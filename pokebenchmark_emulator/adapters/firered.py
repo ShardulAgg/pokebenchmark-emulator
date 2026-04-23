@@ -17,10 +17,22 @@ SB2_PLAYERNAME_LENGTH = 7
 SB2_BADGES_OFFSET = 0x08     # u8 — bitmask of badges
 SB2_SECURITY_KEY_OFFSET = 0x0F20  # u32 — FireRed money XOR key
 
-# Offsets within SaveBlock1 for party + money
-SB1_PARTY_COUNT_OFFSET = 0x34       # u8, 0..6
-SB1_PARTY_OFFSET = 0x38             # 6 × 100-byte PokemonStruct
+# Live EWRAM globals (FireRed US v1.0). SaveBlock1 has mirror copies of
+# these, but the mirror is only updated when the player saves the game
+# in-game — during active gameplay SaveBlock1's playerParty stays stale.
+# Always read the live globals.
+FIRERED_PARTY_COUNT_ADDR = 0x02024029   # u8, 0..6
+FIRERED_PARTY_ADDR = 0x02024284         # 6 × 100-byte PokemonStruct
+
+# SaveBlock1 offsets we still use (these ARE kept live by the game).
 SB1_MONEY_OFFSET = 0x0290           # u32, XOR'd with security key
+SB1_BAG_ITEMS_OFFSET = 0x0310       # 42 × 4-byte ItemSlot (u16 id, u16 qty XOR'd w/ key)
+SB1_BAG_ITEMS_COUNT = 42
+SB1_BAG_KEYITEMS_OFFSET = 0x03B8    # 30 × 4-byte (u16 id, u16 qty NOT encrypted)
+SB1_BAG_KEYITEMS_COUNT = 30
+SB1_BAG_POKEBALLS_OFFSET = 0x0430   # 13 × 4-byte (u16 id, u16 qty XOR'd w/ key)
+SB1_BAG_POKEBALLS_COUNT = 13
+
 GEN3_PARTY_MON_SIZE = 100
 GEN3_PARTY_MAX = 6
 MONEY_CAP = 999_999
@@ -266,32 +278,51 @@ class FireRedAdapter(GameAdapter):
         # module imports `decode_string` from this file).
         from ._gen3_mon import read_gen3_party_mon
 
-        # Read party
+        # Read party from live EWRAM globals (NOT SaveBlock1 mirror)
         party: list[dict] = []
         try:
-            party_count = emulator.read_u8(sb1_base + SB1_PARTY_COUNT_OFFSET)
+            party_count = emulator.read_u8(FIRERED_PARTY_COUNT_ADDR)
             for i in range(min(party_count, GEN3_PARTY_MAX)):
-                slot_addr = sb1_base + SB1_PARTY_OFFSET + (i * GEN3_PARTY_MON_SIZE)
+                slot_addr = FIRERED_PARTY_ADDR + (i * GEN3_PARTY_MON_SIZE)
                 mon = read_gen3_party_mon(emulator, slot_addr)
                 if mon is not None:
                     party.append(mon)
         except Exception:
-            # If a read fails mid-party we return what we have rather than
-            # exploding the whole state read.
             pass
 
-        # Read money (XOR'd with security key)
+        # Read money (XOR'd with security key). SB1 money IS kept live by
+        # the game; only the party mirror is stale.
         try:
             security_key = emulator.read_u32(sb2_base + SB2_SECURITY_KEY_OFFSET)
             money_raw = emulator.read_u32(sb1_base + SB1_MONEY_OFFSET)
             money = (money_raw ^ security_key) & 0xFFFFFFFF
             if money > MONEY_CAP:
-                # Either the security key isn't initialized yet (fresh save,
-                # pre-intro) or we're looking at garbage — game caps at
-                # 999,999 so any higher value is by definition wrong.
                 money = 0
         except Exception:
+            security_key = None
             money = None
+
+        # Read bag (items + key items + pokeballs). Quantities in the
+        # non-keyitem pockets are XOR'd with the low 16 bits of the
+        # security key.
+        bag: list[dict] = []
+        try:
+            qty_key = (security_key & 0xFFFF) if security_key is not None else 0
+            for offset, count, encrypted in (
+                (SB1_BAG_ITEMS_OFFSET, SB1_BAG_ITEMS_COUNT, True),
+                (SB1_BAG_POKEBALLS_OFFSET, SB1_BAG_POKEBALLS_COUNT, True),
+                (SB1_BAG_KEYITEMS_OFFSET, SB1_BAG_KEYITEMS_COUNT, False),
+            ):
+                for i in range(count):
+                    slot = sb1_base + offset + i * 4
+                    item_id = emulator.read_u16(slot)
+                    qty_raw = emulator.read_u16(slot + 2)
+                    if item_id == 0:
+                        continue
+                    qty = (qty_raw ^ qty_key) & 0xFFFF if encrypted else qty_raw
+                    bag.append({"item_id": item_id, "quantity": qty})
+        except Exception:
+            bag = []
 
         return GameState(
             player_name=player_name,
@@ -302,6 +333,7 @@ class FireRedAdapter(GameAdapter):
             badges=badges,
             money=money,
             party=party,
+            bag=bag,
             in_battle=False,
-            # bag / dialog / battle_state left as None — not extracted yet.
+            # dialog / battle_state left as None — not extracted yet.
         )

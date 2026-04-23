@@ -853,16 +853,16 @@ class TestFireRedPartyExtraction:
                 return 1  # map num -> Route 1
             if addr == SAVEBLOCK2_BASE + 0x08:
                 return 0b00000001  # Boulder badge
-            if addr == SAVEBLOCK1_BASE + 0x34:
-                return 1  # party count = 1
+            if addr == 0x02024029:  # FIRERED_PARTY_COUNT_ADDR (live EWRAM)
+                return 1
             return 0
 
         def read_memory(addr, size):
             # Player name
             if addr == SAVEBLOCK2_BASE + 0x00:
                 return bytes([0xCC, 0xBF, 0xBE, 0xFF, 0xFF, 0xFF, 0xFF])[:size]
-            # Party slot 0
-            if addr == SAVEBLOCK1_BASE + 0x38 and size == 100:
+            # Party slot 0 at live EWRAM FIRERED_PARTY_ADDR
+            if addr == 0x02024284 and size == 100:
                 return mon_bytes
             return bytes(size)
 
@@ -909,7 +909,8 @@ class TestFireRedPartyExtraction:
         # We don't detect battles yet — best-effort false.
         assert result.in_battle is False
         assert result.battle_state is None
-        assert result.bag is None
+        # Bag is now read but our mock has empty item slots → empty list, not None.
+        assert result.bag == []
         assert result.dialog is None
 
     def test_read_state_money_cap_zeros_out(self):
