@@ -69,7 +69,7 @@ class GBAEmulator:
 
     def set_keys(self, keys: int) -> None:
         """Set the held-key bitmask (mGBA GBA_KEY_* bits). Persists across frames."""
-        self.gba.core.set_keys(keys)
+        self.gba.core.set_keys(raw=keys)
 
     def run_frame(self) -> None:
         """Advance exactly one frame using currently held keys."""

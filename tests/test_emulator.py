@@ -154,15 +154,15 @@ class TestCaptureFrame:
 
 
 class TestHeldKeyAccessors:
-    def test_set_keys_passes_bitmask_through(self):
+    def test_set_keys_passes_bitmask_as_raw_kwarg(self):
         emu = make_emulator()
         emu.set_keys(0b0101010101)
-        emu.gba.core.set_keys.assert_called_once_with(0b0101010101)
+        emu.gba.core.set_keys.assert_called_once_with(raw=0b0101010101)
 
     def test_set_keys_accepts_zero(self):
         emu = make_emulator()
         emu.set_keys(0)
-        emu.gba.core.set_keys.assert_called_once_with(0)
+        emu.gba.core.set_keys.assert_called_once_with(raw=0)
 
     def test_run_frame_advances_one_frame(self):
         emu = make_emulator()
